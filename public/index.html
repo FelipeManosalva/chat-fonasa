@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Fonasa - Clínica Alemana Osorno</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --verde: #50CB93;
+      --verde-dark: #3aab76;
+      --gris: #f4f5f6;
+      --text: #2b2d33;
+      --border: #e0e2e6;
+    }
+
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background: var(--gris);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: white;
+      padding: 1rem 2rem;
+      border-bottom: 3px solid var(--verde);
+      box-shadow: 0 2px 10px rgba(0,0,0,.05);
+    }
+
+    header h1 {
+      font-size: 1.3rem;
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    header p {
+      font-size: .8rem;
+      color: #7a7f8a;
+      margin-top: .2rem;
+    }
+
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 900px;
+      width: 100%;
+      margin: 2rem auto;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.1);
+      overflow: hidden;
+    }
+
+    .messages {
+      flex: 1;
+      padding: 2rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .message {
+      display: flex;
+      gap: .8rem;
+      animation: slideIn .3s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      flex-direction: row-reverse;
+    }
+
+    .message .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--verde);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: .9rem;
+      flex-shrink: 0;
+    }
+
+    .message.user .avatar {
+      background: #6366f1;
+    }
+
+    .message .bubble {
+      max-width: 70%;
+      padding: .9rem 1.2rem;
+      border-radius: 15px;
+      background: #f8f9fa;
+      color: var(--text);
+      line-height: 1.5;
+      font-size: .9rem;
+    }
+
+    .message.user .bubble {
+      background: #6366f1;
+      color: white;
+    }
+
+    .loading {
+      display: inline-flex;
+      gap: .3rem;
+    }
+
+    .loading span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--verde);
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+    .loading span:nth-child(1) { animation-delay: -0.32s; }
+    .loading span:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+
+    .input-area {
+      padding: 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: .8rem;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: .9rem 1.2rem;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: .9rem;
+      outline: none;
+      transition: border .2s;
+    }
+
+    .input-area input:focus {
+      border-color: var(--verde);
+    }
+
+    .input-area button {
+      padding: .9rem 2rem;
+      background: var(--verde);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+
+    .input-area button:hover {
+      background: var(--verde-dark);
+    }
+
+    .input-area button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>💬 Chat Fonasa - Clínica Alemana Osorno</h1>
+  <p>Consulta precios y copagos de prestaciones médicas</p>
+</header>
+
+<div class="chat-container">
+  <div class="messages" id="messages">
+    <div class="message">
+      <div class="avatar">IA</div>
+      <div class="bubble">
+        ¡Hola! Soy tu asistente virtual. Puedo ayudarte con información sobre precios y copagos de prestaciones médicas Fonasa. ¿Qué necesitas saber?
+      </div>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <input type="text" id="input" placeholder="Ej: ¿Cuánto cuesta una radiografía de tórax?" />
+    <button id="sendBtn">Enviar</button>
+  </div>
+</div>
+
+<script>
+  const messagesDiv = document.getElementById('messages');
+  const input = document.getElementById('input');
+  const sendBtn = document.getElementById('sendBtn');
+
+  function addMessage(text, isUser = false) {
+    const msg = document.createElement('div');
+    msg.className = `message ${isUser ? 'user' : ''}`;
+    msg.innerHTML = `
+      <div class="avatar">${isUser ? 'TÚ' : 'IA'}</div>
+      <div class="bubble">${text}</div>
+    `;
+    messagesDiv.appendChild(msg);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+
+  function addLoadingMessage() {
+    const msg = document.createElement('div');
+    msg.className = 'message';
+    msg.id = 'loading-msg';
+    msg.innerHTML = `
+      <div class="avatar">IA</div>
+      <div class="bubble">
+        <div class="loading">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    `;
+    messagesDiv.appendChild(msg);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+
+  function removeLoadingMessage() {
+    const loading = document.getElementById('loading-msg');
+    if (loading) loading.remove();
+  }
