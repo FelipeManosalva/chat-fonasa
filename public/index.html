@@ -237,3 +237,46 @@
     const loading = document.getElementById('loading-msg');
     if (loading) loading.remove();
   }
+
+  async function sendMessage() {
+    const message = input.value.trim();
+    if (!message) return;
+
+    addMessage(message, true);
+    input.value = '';
+    sendBtn.disabled = true;
+    addLoadingMessage();
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
+
+      const data = await response.json();
+      removeLoadingMessage();
+
+      if (data.response) {
+        addMessage(data.response);
+      } else {
+        addMessage('Lo siento, ocurrió un error. Intenta de nuevo.');
+      }
+    } catch (error) {
+      removeLoadingMessage();
+      addMessage('Error de conexión. Por favor verifica tu red.');
+      console.error('Error:', error);
+    } finally {
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+</script>
+
+</body>
+</html>
