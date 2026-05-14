@@ -36,16 +36,39 @@ async function consultarOllama(prompt) {
   return data.response;
 }
 
-// Función RAG: Buscar información relevante en la BD
+// Función RAG mejorada: Buscar información relevante en la BD
 async function buscarContexto(pregunta) {
   try {
-    // Buscar prestaciones relacionadas con la pregunta
+    // Extraer palabras clave de la pregunta (más de 3 letras)
+    const palabrasClave = pregunta.toLowerCase()
+      .replace(/[¿?¡!,.:;]/g, '') // quitar puntuación
+      .split(' ')
+      .filter(p => p.length > 3); // solo palabras significativas
+    
+    if (palabrasClave.length === 0) {
+      return [];
+    }
+    
+    // Construir la consulta con OR para cada palabra clave
+    const conditions = palabrasClave.map((_, index) => {
+      const paramIndex = index + 1;
+      return `(nombre ILIKE $${paramIndex} OR descripcion ILIKE $${paramIndex} OR categoria ILIKE $${paramIndex})`;
+    }).join(' OR ');
+    
+    const params = palabrasClave.map(p => `%${p}%`);
+    
     const result = await pool.query(
       `SELECT nombre, codigo_fonasa, precio, copago, categoria, descripcion 
        FROM prestaciones 
-       WHERE nombre ILIKE $1 OR descripcion ILIKE $1 OR categoria ILIKE $1
+       WHERE ${conditions}
+       ORDER BY 
+         CASE 
+           WHEN nombre ILIKE $1 THEN 1
+           WHEN descripcion ILIKE $1 THEN 2
+           ELSE 3
+         END
        LIMIT 5`,
-      [`%${pregunta}%`]
+      params
     );
     
     return result.rows;
@@ -63,6 +86,8 @@ app.post('/api/chat', async (req, res) => {
   try {
     // 1. Buscar información relevante en la BD
     const contexto = await buscarContexto(pregunta);
+    
+    console.log(`📊 Búsqueda: "${pregunta}" → ${contexto.length} resultados encontrados`);
     
     // 2. Construir el prompt con el contexto
     let prompt = `Eres un asistente de la Clínica Alemana Osorno especializado en precios de prestaciones médicas Fonasa.
@@ -84,7 +109,7 @@ INSTRUCCIONES:
 - Responde SOLO con la información proporcionada arriba
 - Si no hay información disponible, di "No tengo información sobre eso en este momento"
 - Sé claro, preciso y amable
-- Formatea los precios correctamente (ej: $50.000)
+- Formatea los precios correctamente (ej: $15.000)
 - Menciona el código Fonasa cuando sea relevante
 
 RESPUESTA:`;
