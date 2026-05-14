@@ -56,7 +56,8 @@ async function buscarContexto(pregunta) {
 }
 
 // RUTA: Chat con IA
-app.post('/api/chat', async (req, res) => {
+const { message } = req.body;
+const pregunta = message;
   const { pregunta } = req.body;
 
   try {
