@@ -40,4 +40,156 @@ async function consultarOllama(prompt) {
 async function buscarContexto(pregunta) {
   try {
     // Extraer palabras clave de la pregunta (más de 3 letras)
-    const palabrasClave = pregunta.toLow
+    const palabrasClave = pregunta.toLowerCase()
+      .replace(/[¿?¡!,.:;]/g, '')
+      .split(' ')
+      .filter(p => p.length > 3);
+    
+    if (palabrasClave.length === 0) {
+      return [];
+    }
+    
+    // Construir la consulta con OR para cada palabra clave
+    const conditions = palabrasClave.map((_, index) => {
+      const paramIndex = index + 1;
+      return `(nombre ILIKE $${paramIndex} OR descripcion ILIKE $${paramIndex} OR categoria ILIKE $${paramIndex})`;
+    }).join(' OR ');
+    
+    const params = palabrasClave.map(p => `%${p}%`);
+    
+    const result = await pool.query(
+      `SELECT nombre, codigo_fonasa, precio, copago, categoria, descripcion 
+       FROM prestaciones 
+       WHERE ${conditions}
+       ORDER BY 
+         CASE 
+           WHEN nombre ILIKE $1 THEN 1
+           WHEN descripcion ILIKE $1 THEN 2
+           ELSE 3
+         END
+       LIMIT 5`,
+      params
+    );
+    
+    return result.rows;
+  } catch (error) {
+    console.error('Error buscando contexto:', error);
+    return [];
+  }
+}
+
+// RUTA: Chat con IA
+app.post('/api/chat', async (req, res) => {
+  const { message } = req.body;
+  const pregunta = message;
+
+  try {
+    // 1. Buscar información relevante en la BD
+    const contexto = await buscarContexto(pregunta);
+    
+    console.log(`📊 Búsqueda: "${pregunta}" → ${contexto.length} resultados encontrados`);
+    
+    // 2. Construir el prompt con el contexto
+    let prompt = `Eres un asistente virtual de la Clínica Alemana Osorno. Tu trabajo es responder preguntas sobre precios de prestaciones médicas Fonasa usando ÚNICAMENTE la información que te proporciono a continuación.
+
+${contexto.length > 0 
+  ? `PRESTACIONES DISPONIBLES:\n` + contexto.map(p => `
+- ${p.nombre}
+  - Código Fonasa: ${p.codigo_fonasa}
+  - Precio: $${Number(p.precio).toLocaleString('es-CL')}
+  - Copago: ${p.copago}%
+  - Categoría: ${p.categoria}
+  - Descripción: ${p.descripcion || 'N/A'}
+`).join('\n')
+  : 'No se encontró información en la base de datos.'}
+
+PREGUNTA DEL USUARIO: ${pregunta}
+
+INSTRUCCIONES IMPORTANTES:
+- Si encontraste prestaciones arriba, responde con esos detalles exactos
+- Menciona el precio, código Fonasa y copago
+- Si NO hay información arriba, di "No tengo esa información disponible en este momento"
+- Sé directo y claro
+
+RESPUESTA:`;
+
+    // 3. Consultar a Ollama
+    const respuesta = await consultarOllama(prompt);
+
+    res.json({
+      response: respuesta,
+      contexto_usado: contexto.length
+    });
+
+  } catch (error) {
+    console.error('Error en chat:', error);
+    res.status(500).json({ error: 'Error al procesar la consulta' });
+  }
+});
+
+// RUTA: Listar todas las prestaciones (para admin)
+app.get('/api/prestaciones', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM prestaciones ORDER BY nombre');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error obteniendo prestaciones:', error);
+    res.status(500).json({ error: 'Error al obtener prestaciones' });
+  }
+});
+
+// RUTA: Agregar prestación
+app.post('/api/prestaciones', async (req, res) => {
+  const { nombre, codigo_fonasa, precio, copago, categoria, descripcion } = req.body;
+  
+  try {
+    const result = await pool.query(
+      `INSERT INTO prestaciones (nombre, codigo_fonasa, precio, copago, categoria, descripcion) 
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [nombre, codigo_fonasa, precio, copago, categoria, descripcion]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error agregando prestación:', error);
+    res.status(500).json({ error: 'Error al agregar prestación' });
+  }
+});
+
+// RUTA: Actualizar prestación
+app.put('/api/prestaciones/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nombre, codigo_fonasa, precio, copago, categoria, descripcion } = req.body;
+  
+  try {
+    const result = await pool.query(
+      `UPDATE prestaciones 
+       SET nombre=$1, codigo_fonasa=$2, precio=$3, copago=$4, categoria=$5, descripcion=$6 
+       WHERE id=$7 RETURNING *`,
+      [nombre, codigo_fonasa, precio, copago, categoria, descripcion, id]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error actualizando prestación:', error);
+    res.status(500).json({ error: 'Error al actualizar prestación' });
+  }
+});
+
+// RUTA: Eliminar prestación
+app.delete('/api/prestaciones/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    await pool.query('DELETE FROM prestaciones WHERE id=$1', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error eliminando prestación:', error);
+    res.status(500).json({ error: 'Error al eliminar prestación' });
+  }
+});
+
+// Iniciar servidor
+app.listen(PORT, () => {
+  console.log(`✓ Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`✓ Conectado a PostgreSQL: ${process.env.DB_HOST}`);
+  console.log(`✓ Ollama URL: ${process.env.OLLAMA_URL}`);
+});
