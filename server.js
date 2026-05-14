@@ -56,9 +56,9 @@ async function buscarContexto(pregunta) {
 }
 
 // RUTA: Chat con IA
-const { message } = req.body;
-const pregunta = message;
-  const { pregunta } = req.body;
+app.post('/api/chat', async (req, res) => {
+  const { message } = req.body;
+  const pregunta = message;
 
   try {
     // 1. Buscar información relevante en la BD
@@ -93,7 +93,7 @@ RESPUESTA:`;
     const respuesta = await consultarOllama(prompt);
 
     res.json({
-      respuesta: respuesta,
+      response: respuesta,
       contexto_usado: contexto.length
     });
 
