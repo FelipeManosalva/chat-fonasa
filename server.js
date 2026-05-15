@@ -39,11 +39,8 @@ async function consultarOllama(prompt) {
 // Función RAG mejorada: Buscar información relevante en la BD
 async function buscarContexto(pregunta) {
   try {
-    // Extraer palabras clave de la pregunta (más de 3 letras)
-    const palabrasClave = pregunta.toLowerCase()
-      .replace(/[¿?¡!,.:;]/g, '')
-      .split(' ')
-      .filter(p => p.length > 3);
+    // Extraer palabras clave de la pregunta
+    const palabrasClave = pregunta.toLowerCase().replace(/[¿?¡!,.:;]/g, '').split(' ').filter(p => p.length > 3);
     
     if (palabrasClave.length === 0) {
       return [];
@@ -84,13 +81,11 @@ app.post('/api/chat', async (req, res) => {
   const pregunta = message;
 
   try {
-    // 1. Buscar información relevante en la BD
     const contexto = await buscarContexto(pregunta);
     
-    console.log(`📊 Búsqueda: "${pregunta}" → ${contexto.length} resultados encontrados`);
+    console.log(`Búsqueda: "${pregunta}" encontró ${contexto.length} resultados`);
     
-    // 2. Construir el prompt con el contexto
-    let prompt = `Eres un asistente virtual de la Clínica Alemana Osorno. Tu trabajo es responder preguntas sobre precios de prestaciones médicas Fonasa usando ÚNICAMENTE la información que te proporciono a continuación.
+    let prompt = `Eres un asistente virtual de la Clínica Alemana Osorno. Responde preguntas sobre precios de prestaciones médicas Fonasa usando ÚNICAMENTE la información que te proporciono.
 
 ${contexto.length > 0 
   ? `PRESTACIONES DISPONIBLES:\n` + contexto.map(p => `
@@ -103,17 +98,16 @@ ${contexto.length > 0
 `).join('\n')
   : 'No se encontró información en la base de datos.'}
 
-PREGUNTA DEL USUARIO: ${pregunta}
+PREGUNTA: ${pregunta}
 
-INSTRUCCIONES IMPORTANTES:
+INSTRUCCIONES:
 - Si encontraste prestaciones arriba, responde con esos detalles exactos
 - Menciona el precio, código Fonasa y copago
-- Si NO hay información arriba, di "No tengo esa información disponible en este momento"
+- Si NO hay información arriba, di "No tengo esa información disponible"
 - Sé directo y claro
 
 RESPUESTA:`;
 
-    // 3. Consultar a Ollama
     const respuesta = await consultarOllama(prompt);
 
     res.json({
@@ -127,7 +121,7 @@ RESPUESTA:`;
   }
 });
 
-// RUTA: Listar todas las prestaciones (para admin)
+// RUTA: Listar todas las prestaciones
 app.get('/api/prestaciones', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM prestaciones ORDER BY nombre');
