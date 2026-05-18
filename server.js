@@ -39,14 +39,12 @@ async function consultarOllama(prompt) {
 // Función RAG mejorada: Buscar información relevante en la BD
 async function buscarContexto(pregunta) {
   try {
-    // Extraer palabras clave de la pregunta
     const palabrasClave = pregunta.toLowerCase().replace(/[¿?¡!,.:;]/g, '').split(' ').filter(p => p.length > 3);
     
     if (palabrasClave.length === 0) {
       return [];
     }
     
-    // Construir la consulta con OR para cada palabra clave
     const conditions = palabrasClave.map((_, index) => {
       const paramIndex = index + 1;
       return `(nombre ILIKE $${paramIndex} OR descripcion ILIKE $${paramIndex} OR categoria ILIKE $${paramIndex})`;
@@ -85,28 +83,40 @@ app.post('/api/chat', async (req, res) => {
     
     console.log(`Búsqueda: "${pregunta}" encontró ${contexto.length} resultados`);
     
-    let prompt = `Eres un asistente virtual de la Clínica Alemana Osorno. Responde preguntas sobre precios de prestaciones médicas Fonasa usando ÚNICAMENTE la información que te proporciono.
+    let prompt = '';
+    
+    if (contexto.length > 0) {
+      // Encontró prestaciones médicas en la base de datos
+      prompt = `Eres un asistente amigable y profesional de la Clínica Alemana Osorno. 
 
-${contexto.length > 0 
-  ? `PRESTACIONES DISPONIBLES:\n` + contexto.map(p => `
+El paciente pregunta: "${pregunta}"
+
+Tienes esta información disponible en la base de datos:
+${contexto.map(p => `
 - ${p.nombre}
   - Código Fonasa: ${p.codigo_fonasa}
   - Precio: $${Number(p.precio).toLocaleString('es-CL')}
   - Copago: ${p.copago}%
   - Categoría: ${p.categoria}
   - Descripción: ${p.descripcion || 'N/A'}
-`).join('\n')
-  : 'No se encontró información en la base de datos.'}
+`).join('\n')}
 
-PREGUNTA: ${pregunta}
+IMPORTANTE: Responde usando esta información exacta. Menciona el precio, código Fonasa y copago de forma clara y amigable.`;
+    } else {
+      // No encontró prestaciones - respuesta conversacional libre
+      prompt = `Eres un asistente amigable de la Clínica Alemana Osorno. Puedes conversar naturalmente sobre temas generales, dar consejos de salud, responder preguntas médicas generales, y ser un compañero conversacional agradable.
 
-INSTRUCCIONES:
-- Si encontraste prestaciones arriba, responde con esos detalles exactos
-- Menciona el precio, código Fonasa y copago
-- Si NO hay información arriba, di "No tengo esa información disponible"
-- Sé directo y claro
+El usuario dice: "${pregunta}"
 
-RESPUESTA:`;
+Responde de forma natural, amigable y útil:
+- Si es un saludo, saluda de vuelta y ofrece ayuda
+- Si es una pregunta de salud general, responde con información útil (pero aclara que no reemplaza una consulta médica)
+- Si te preguntan por precios o prestaciones específicas que no están en tu base de datos, di que no tienes esa información disponible y sugiere consultar directamente con la clínica
+- Si es conversación casual, participa de forma amigable
+- Mantén un tono profesional pero cercano
+
+Responde en español de forma natural y conversacional.`;
+    }
 
     const respuesta = await consultarOllama(prompt);
 
