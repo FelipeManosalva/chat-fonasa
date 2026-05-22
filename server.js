@@ -39,7 +39,7 @@ async function consultarOllama(prompt) {
 // Función RAG mejorada: Buscar información relevante en la BD
 async function buscarContexto(pregunta) {
   try {
-    const palabrasClave = pregunta.toLowerCase().replace(/[¿?¡!,.:;]/g, '').split(' ').filter(p => p.length > 3);
+    const palabrasClave = pregunta.toLowerCase().replace(/[¿?¡!,.:;]/g, '').split(' ').filter(p => p.length > 1);
     
     if (palabrasClave.length === 0) {
       return [];
