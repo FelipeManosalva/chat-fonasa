@@ -87,35 +87,42 @@ app.post('/api/chat', async (req, res) => {
     
     if (contexto.length > 0) {
       // Encontró prestaciones médicas en la base de datos
-      prompt = `Eres un asistente amigable y profesional de la Clínica Alemana Osorno. 
+      prompt = `Eres un asistente de la Clínica Alemana Osorno. Responde de forma BREVE y DIRECTA.
 
-El paciente pregunta: "${pregunta}"
+Pregunta: "${pregunta}"
 
-Tienes esta información disponible en la base de datos:
+Información disponible:
 ${contexto.map(p => `
 - ${p.nombre}
-  - Código Fonasa: ${p.codigo_fonasa}
-  - Precio: $${Number(p.precio).toLocaleString('es-CL')}
-  - Copago: ${p.copago}%
-  - Categoría: ${p.categoria}
-  - Descripción: ${p.descripcion || 'N/A'}
+  Código Fonasa: ${p.codigo_fonasa}
+  Precio: $${Number(p.precio).toLocaleString('es-CL')}
+  Copago: ${p.copago}%
 `).join('\n')}
 
-IMPORTANTE: Responde usando esta información exacta. Menciona el precio, código Fonasa y copago de forma clara y amigable.`;
+INSTRUCCIONES CRÍTICAS:
+- Respuesta MÁXIMO 3-4 líneas
+- Ir directo al punto
+- Mencionar solo: nombre, precio, código y copago
+- NO dar explicaciones largas
+- NO dar consejos adicionales
+- Ser cordial pero breve
+
+Respuesta corta:`;
     } else {
       // No encontró prestaciones - respuesta conversacional libre
-      prompt = `Eres un asistente amigable de la Clínica Alemana Osorno. Puedes conversar naturalmente sobre temas generales, dar consejos de salud, responder preguntas médicas generales, y ser un compañero conversacional agradable.
+      prompt = `Eres un asistente de la Clínica Alemana Osorno. Responde de forma BREVE y DIRECTA.
 
-El usuario dice: "${pregunta}"
+Usuario: "${pregunta}"
 
-Responde de forma natural, amigable y útil:
-- Si es un saludo, saluda de vuelta y ofrece ayuda
-- Si es una pregunta de salud general, responde con información útil (pero aclara que no reemplaza una consulta médica)
-- Si te preguntan por precios o prestaciones específicas que no están en tu base de datos, di que no tienes esa información disponible y sugiere consultar directamente con la clínica
-- Si es conversación casual, participa de forma amigable
-- Mantén un tono profesional pero cercano
+INSTRUCCIONES CRÍTICAS:
+- Respuesta MÁXIMO 2-3 líneas
+- Ser amigable pero conciso
+- Si es saludo: saluda y ofrece ayuda brevemente
+- Si pregunta algo que no sabes: di que no tienes esa info y ofrece ayudar con otra cosa
+- NO dar párrafos largos
+- NO dar demasiados detalles
 
-Responde en español de forma natural y conversacional.`;
+Respuesta corta:`;
     }
 
     const respuesta = await consultarOllama(prompt);
